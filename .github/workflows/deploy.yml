@@ -14,7 +14,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    steps:
+    steps0:
+      - name: Check identity
+        run: aws sts get-caller-identity
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
