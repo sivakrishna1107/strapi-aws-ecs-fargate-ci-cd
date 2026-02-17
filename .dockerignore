@@ -1,0 +1,17 @@
+node_modules
+
+.env
+.git
+.gitignore
+
+.cache
+build
+tmp
+logs
+
+README.md
+terraform
+variables.tf
+outputs.tf
+provider.tf
+

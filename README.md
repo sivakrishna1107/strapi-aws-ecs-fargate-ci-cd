@@ -1,62 +1,142 @@
-# 🚀 Getting started with Strapi
+Strapi Deployment on AWS ECS Fargate using Terraform and GitHub Actions
 
-Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.
+Project Overview
 
-### `develop`
+This project demonstrates how to deploy a production-ready Strapi application on AWS ECS Fargate. The entire infrastructure is managed using Terraform and the deployment process is fully automated using GitHub Actions.
 
-Start your Strapi application with autoReload enabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-develop)
+The pipeline builds a Docker image, pushes it to Amazon ECR, and updates the ECS Task Definition automatically. No manual AWS Console steps are required after initial setup.
 
-```
-npm run develop
-# or
-yarn develop
-```
+Architecture
 
-### `start`
+The application uses the following AWS services:
 
-Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
+Amazon ECS for container orchestration
+Amazon ECS Fargate as the serverless compute engine
+Amazon Elastic Container Registry for storing Docker images
+Application Load Balancer for public access
+Amazon CloudWatch for logs
+IAM Roles for permissions
+VPC and Subnets for networking
 
-```
-npm run start
-# or
-yarn start
-```
+When code is pushed to the main branch, GitHub Actions automatically builds and deploys a new version of the application.
 
-### `build`
+Repository Structure
 
-Build your admin panel. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-build)
+app
+Contains the Strapi application and Dockerfile
 
-```
-npm run build
-# or
-yarn build
-```
+terraform
+Contains all Terraform configuration files
+provider.tf
+variables.tf
+main.tf
+outputs.tf
 
-## ⚙️ Deployment
+.github/workflows
+Contains GitHub Actions workflow file
 
-Strapi gives you many possible deployment options for your project including [Strapi Cloud](https://cloud.strapi.io). Browse the [deployment section of the documentation](https://docs.strapi.io/dev-docs/deployment) to find the best solution for your use case.
+How Deployment Works
 
-```
-yarn strapi deploy
-```
+Step 1
+Developer pushes code to main branch
 
-## 📚 Learn more
+Step 2
+GitHub Actions workflow starts automatically
 
-- [Resource center](https://strapi.io/resource-center) - Strapi resource center.
-- [Strapi documentation](https://docs.strapi.io) - Official Strapi documentation.
-- [Strapi tutorials](https://strapi.io/tutorials) - List of tutorials made by the core team and the community.
-- [Strapi blog](https://strapi.io/blog) - Official Strapi blog containing articles made by the Strapi team and the community.
-- [Changelog](https://strapi.io/changelog) - Find out about the Strapi product updates, new features and general improvements.
+Step 3
+Docker image is built from the app folder
 
-Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
+Step 4
+Image is tagged with the Git commit SHA
 
-## ✨ Community
+Step 5
+Image is pushed to Amazon Elastic Container Registry
 
-- [Discord](https://discord.strapi.io) - Come chat with the Strapi community including the core team.
-- [Forum](https://forum.strapi.io/) - Place to discuss, ask questions and find answers, show your Strapi project and get feedback or just talk with other Community members.
-- [Awesome Strapi](https://github.com/strapi/awesome-strapi) - A curated list of awesome things related to Strapi.
+Step 6
+Terraform apply runs with the new image tag
 
----
+Step 7
+A new ECS Task Definition revision is created
 
-<sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
-# strapi-aws-ecs-fargate-ci-cd
+Step 8
+ECS Service updates automatically and deploys the new version
+
+Prerequisites
+
+AWS Account
+IAM user with programmatic access
+GitHub repository
+Docker installed locally for development
+
+Required GitHub Secrets
+
+Go to repository settings and add the following secrets:
+
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+
+Terraform Configuration
+
+Terraform manages:
+
+ECR repository
+ECS cluster
+IAM roles
+Task definition
+Fargate service
+Networking configuration
+
+The image tag is dynamically passed from GitHub Actions to Terraform so each deployment creates a new task revision.
+
+How to Access Strapi
+
+After successful deployment:
+
+Go to AWS Console
+Navigate to EC2
+Open Load Balancers
+Copy the DNS name
+
+Access in browser:
+
+http://load-balancer-dns-name
+
+If using public IP configuration instead of ALB:
+
+Go to ECS
+Select Cluster
+Select Service
+Open Running Task
+Copy Public IP
+
+Access in browser:
+
+http://public-ip:1337
+
+Security Group Requirements
+
+Inbound rule must allow:
+
+Port 80 or 1337
+Source 0.0.0.0/0
+
+Strapi must be configured to run on host 0.0.0.0 to allow external access.
+
+Production Improvements
+
+Store Terraform state in S3
+Enable state locking using DynamoDB
+Use private subnets
+Use RDS for database
+Enable auto scaling
+Add HTTPS using ACM
+
+What This Project Demonstrates
+
+Infrastructure as Code using Terraform
+Containerization using Docker
+CI CD using GitHub Actions
+Serverless container deployment using ECS Fargate
+Automated image versioning and task revision updates
+
+This project represents a production-style DevOps workflow with zero manual deployment steps.
