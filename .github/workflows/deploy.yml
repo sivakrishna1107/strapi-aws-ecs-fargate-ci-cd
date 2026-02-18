@@ -1,14 +1,16 @@
-name: Deploy Strapi ECS EC2
+name: Deploy Strapi to ECS
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 env:
   AWS_REGION: ap-south-1
-  DOCKER_IMAGE: sivakrishna1107/strapi-task7
+  ECR_REPOSITORY: strapi-task7
+  ECS_CLUSTER: strapi-cluster
+  ECS_SERVICE: strapi-service
+  TASK_FAMILY: strapi-task
 
 jobs:
   deploy:
@@ -16,39 +18,51 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Generate Image Tag
-        run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-      - name: Build Docker Image
-        run: docker build -t $DOCKER_IMAGE:$IMAGE_TAG .
-
-      - name: Push Image
-        run: docker push $DOCKER_IMAGE:$IMAGE_TAG
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init
+      - name: Login to ECR
         run: |
-          cd terraform
-          terraform init
+          aws ecr get-login-password --region $AWS_REGION \
+          | docker login --username AWS \
+          --password-stdin $(aws ecr describe-repositories \
+          --repository-names $ECR_REPOSITORY \
+          --query 'repositories[0].repositoryUri' \
+          --output text)
 
-      - name: Terraform Apply
+      - name: Build Docker Image
         run: |
-          cd terraform
-          terraform apply -auto-approve \
-            -var="image_tag=$IMAGE_TAG" \
-            -var="docker_image=$DOCKER_IMAGE"
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./app
+
+      - name: Tag Image
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+          IMAGE_TAG=${{ github.sha }}
+
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:$IMAGE_TAG
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:latest
+
+      - name: Push Image
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+          IMAGE_TAG=${{ github.sha }}
+
+          docker push $IMAGE_URI:$IMAGE_TAG
+          docker push $IMAGE_URI:latest
+
+      - name: Update ECS Service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment
 

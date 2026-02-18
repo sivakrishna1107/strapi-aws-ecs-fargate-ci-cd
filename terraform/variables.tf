@@ -1,11 +1,8 @@
-variable "aws_region" {
-  default = "ap-south-1"
+variable "execution_role_arn" {}
+variable "subnets" {
+  type = list(string)
+}
+variable "security_groups" {
+  type = list(string)
 }
 
-variable "docker_image" {
-  description = "Docker image URL"
-}
-
-variable "image_tag" {
-  default = "latest"
-}
