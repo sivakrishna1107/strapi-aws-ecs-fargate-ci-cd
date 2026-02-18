@@ -3,14 +3,13 @@ name: Deploy Strapi to ECS
 on:
   push:
     branches:
-      - main
+      - main   # change to master if your branch is master
 
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: strapi-task7
   ECS_CLUSTER: strapi-cluster
   ECS_SERVICE: strapi-service
-  TASK_FAMILY: strapi-task
 
 jobs:
   deploy:
@@ -18,48 +17,39 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+      # Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region $AWS_REGION \
-          | docker login --username AWS \
-          --password-stdin $(aws ecr describe-repositories \
-          --repository-names $ECR_REPOSITORY \
-          --query 'repositories[0].repositoryUri' \
-          --output text)
+      # Debug account (important for your issue)
+      - name: Debug AWS Identity
+        run: aws sts get-caller-identity
 
-      - name: Build Docker Image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+      # Login to ECR (clean method)
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Tag Image
+      # Build, Tag and Push image
+      - name: Build and Push Docker Image
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
           IMAGE_TAG=${{ github.sha }}
 
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:$IMAGE_TAG
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI:latest
+          echo "Building image..."
+          docker build -t $IMAGE_URI:$IMAGE_TAG .
 
-      - name: Push Image
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
-          IMAGE_TAG=${{ github.sha }}
-
+          echo "Pushing image..."
           docker push $IMAGE_URI:$IMAGE_TAG
-          docker push $IMAGE_URI:latest
 
-      - name: Update ECS Service
+      # Force ECS deployment
+      - name: Deploy to ECS
         run: |
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
